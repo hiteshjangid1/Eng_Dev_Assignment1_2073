@@ -1,0 +1,10 @@
+target/
+.idea/
+*.iml
+.classpath
+.project
+.settings/
+reports/
+docs/node_modules/
+docs/package-lock.json
+.DS_Store

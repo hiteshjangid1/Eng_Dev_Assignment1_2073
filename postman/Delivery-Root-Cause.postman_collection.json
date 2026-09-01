@@ -1,0 +1,484 @@
+{
+  "info": {
+    "_postman_id": "a7c3e8d1-4b2f-4e91-9c6a-delivery-rca-001",
+    "name": "Delivery Root-Cause Analyzer",
+    "description": "Tests the local Spring Boot root-cause API (Java 17).\n\n**Before you start:** `mvn spring-boot:run` and wait until Tomcat is on port 8080.\n\nImport this collection **and** `local.postman_environment.json`, then select environment **Delivery RCA — local**.\n\nWalk through folders top to bottom. Each use-case request matches one assignment question.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "http://localhost:8080"
+    }
+  ],
+  "item": [
+    {
+      "name": "0. Catalog",
+      "item": [
+        {
+          "name": "Meta — cities, warehouses, demo hints",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/meta",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "meta"]
+            },
+            "description": "Sanity check that the app loaded CSVs. Expect `orders: 10000`, `asOfDate: 2025-09-12`, city list, and `demoHints`.\n\nUse this to pick other `clientId` / `warehouseId` values for later requests."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('HTTP 200', () => pm.response.to.have.status(200));",
+                  "const j = pm.response.json();",
+                  "pm.test('Loaded 10000 orders', () => pm.expect(j.orders).to.eql(10000));",
+                  "pm.test('Has cities and demoHints', () => {",
+                  "  pm.expect(j.cities).to.be.an('array').that.is.not.empty;",
+                  "  pm.expect(j.demoHints).to.have.property('cityX');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "Run all 6 demo use cases at once",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/insights/demo",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "insights", "demo"]
+            },
+            "description": "Returns a JSON object with six reports:\n- `1_city_yesterday`\n- `2_client_week`\n- `3_warehouse_b_august`\n- `4_city_compare`\n- `5_festival`\n- `6_onboard_client_y`\n\nGood first demo in a video: one call, six narratives."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('HTTP 200', () => pm.response.to.have.status(200));",
+                  "const j = pm.response.json();",
+                  "['1_city_yesterday','2_client_week','3_warehouse_b_august','4_city_compare','5_festival','6_onboard_client_y'].forEach(k => {",
+                  "  pm.test(k + ' has narrative', () => {",
+                  "    pm.expect(j[k]).to.exist;",
+                  "    pm.expect(j[k].narrative).to.be.a('string').that.is.not.empty;",
+                  "  });",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "1. Sample use cases",
+      "item": [
+        {
+          "name": "1 — Why were deliveries delayed in City X yesterday?",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/insights/city-delays?city=New Delhi&date=2025-01-24",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "insights", "city-delays"],
+              "query": [
+                { "key": "city", "value": "New Delhi", "description": "City X. Also try: Ahmedabad, Chennai, Bengaluru, Pune" },
+                { "key": "date", "value": "2025-01-24", "description": "Operational 'yesterday' — busiest problem day in the CSV (not OS clock)" }
+              ]
+            },
+            "description": "**Assignment Q1.** Dataset calendar is Jan–Sep 2025, so 'yesterday' is **2025-01-24** in New Delhi (highest problem city-day).\n\n**What to look for**\n- `metrics.orders` around 27\n- `metrics.problems` and `problemRate`\n- `causes[]` ranked (weather, stockout, warehouse, address, traffic)\n- `narrative` paragraph\n- `recommendations[]`\n- `sampleOrderIds`\n\n**Alternate:** `city=Ahmedabad&date=2025-07-15`"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('HTTP 200', () => pm.response.to.have.status(200));",
+                  "const j = pm.response.json();",
+                  "pm.test('Has insight fields', () => {",
+                  "  pm.expect(j.title).to.include('City');",
+                  "  pm.expect(j.metrics.orders).to.be.above(0);",
+                  "  pm.expect(j.narrative).to.include('New Delhi');",
+                  "  pm.expect(j.recommendations).to.be.an('array').that.is.not.empty;",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "2 — Why did Client X's orders fail last week?",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/insights/client-failures?clientId=409&from=2025-08-10&to=2025-08-16",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "insights", "client-failures"],
+              "query": [
+                { "key": "clientId", "value": "409", "description": "Client X = Bath, Bhatt and Gulati" },
+                { "key": "from", "value": "2025-08-10" },
+                { "key": "to", "value": "2025-08-16" }
+              ]
+            },
+            "description": "**Assignment Q2.** Client **409** (Bath, Bhatt and Gulati) in a week that actually has failed/returned orders.\n\n**What to look for**\n- Scope contains the client name\n- Small slice (~3 orders) with 100% problem rate — still explains weather / warehouse / breakdown\n\n**Alternate client:** `clientId=390` (Sha and Sons) with a wider range, e.g. `from=2025-05-01&to=2025-05-31`"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('HTTP 200', () => pm.response.to.have.status(200));",
+                  "const j = pm.response.json();",
+                  "pm.test('Client 409 named in scope', () => {",
+                  "  pm.expect(j.scope).to.match(/409/);",
+                  "  pm.expect(j.metrics.orders).to.be.at.least(1);",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "3 — Top failure reasons for Warehouse B in August",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/insights/warehouse-failures?warehouseId=2&yearMonth=2025-08",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "insights", "warehouse-failures"],
+              "query": [
+                { "key": "warehouseId", "value": "2", "description": "Warehouse B = Warehouse 2, Pune" },
+                { "key": "yearMonth", "value": "2025-08", "description": "ISO year-month" }
+              ]
+            },
+            "description": "**Assignment Q3.** `warehouseId=2` is aliased as **Warehouse B** (Pune).\n\n**What to look for**\n- Title/scope mentions Warehouse B / Warehouse 2\n- Causes include warehouse delay, system issue, slow packing, stockout\n- `yearMonth` format must be `YYYY-MM` (not `08-2025`)"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('HTTP 200', () => pm.response.to.have.status(200));",
+                  "const j = pm.response.json();",
+                  "pm.test('Warehouse B / Pune', () => {",
+                  "  pm.expect(j.scope).to.match(/Warehouse 2|Warehouse B|Pune/i);",
+                  "  pm.expect(j.metrics.orders).to.be.above(0);",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "4 — Compare City A vs City B last month",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/insights/city-compare?cityA=New Delhi&cityB=Ahmedabad&yearMonth=2025-08",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "insights", "city-compare"],
+              "query": [
+                { "key": "cityA", "value": "New Delhi" },
+                { "key": "cityB", "value": "Ahmedabad" },
+                { "key": "yearMonth", "value": "2025-08" }
+              ]
+            },
+            "description": "**Assignment Q4.** Side-by-side New Delhi vs Ahmedabad for August 2025.\n\n**What to look for**\n- Metrics for both cities (`New Delhi orders`, `Ahmedabad problem rate`, top cause each)\n- Narrative that says whether the **primary cause differs**\n- Ranked causes tagged with the city name in `evidenceNote`\n\n**Alternate:** `cityA=Chennai&cityB=Bengaluru&yearMonth=2025-07`"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('HTTP 200', () => pm.response.to.have.status(200));",
+                  "const j = pm.response.json();",
+                  "pm.test('Both cities in metrics', () => {",
+                  "  pm.expect(j.metrics).to.have.property('New Delhi orders');",
+                  "  pm.expect(j.metrics).to.have.property('Ahmedabad orders');",
+                  "  pm.expect(j.narrative).to.include('New Delhi');",
+                  "  pm.expect(j.narrative).to.include('Ahmedabad');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "5 — Festival period causes and how to prepare",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/insights/festival?from=2025-01-01&to=2025-09-12",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "insights", "festival"],
+              "query": [
+                { "key": "from", "value": "2025-01-01" },
+                { "key": "to", "value": "2025-09-12" }
+              ]
+            },
+            "description": "**Assignment Q5.** Festival is a flag on `external_factors.event_type`, not a Diwali calendar window.\n\n**What to look for**\n- `festivalOrders` vs `baselineOrders`\n- `festivalProblemRate` vs `baselineProblemRate` (in this CSV they are close — that is expected)\n- Recommendations include a festival control-tower / surge roster"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('HTTP 200', () => pm.response.to.have.status(200));",
+                  "const j = pm.response.json();",
+                  "pm.test('Festival vs baseline metrics', () => {",
+                  "  pm.expect(j.metrics.festivalOrders).to.be.above(0);",
+                  "  pm.expect(j.metrics.baselineOrders).to.be.above(0);",
+                  "  pm.expect(j.narrative).to.match(/Festival/i);",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "6 — Onboard Client Y with ~20,000 extra monthly orders",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/insights/capacity-risk?similarClientId=118&extraMonthlyOrders=20000",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "insights", "capacity-risk"],
+              "query": [
+                { "key": "similarClientId", "value": "118", "description": "Proxy Client Y = Atwal-Dhawan" },
+                { "key": "extraMonthlyOrders", "value": "20000" }
+              ]
+            },
+            "description": "**Assignment Q6.** What-if: add 20k monthly orders using client **118** Atwal-Dhawan as the failure-mix proxy.\n\n**What to look for**\n- `volumeIncreaseVsCurrentMonthly` around 18x\n- `expectedExtraProblemShipmentsPerMonth`\n- Narrative that this is a network redesign, not a small onboard\n- Mitigations: phase volume, extra pack lines in New Delhi\n\n**Alternate:** `extraMonthlyOrders=5000` to see a smaller surge story."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('HTTP 200', () => pm.response.to.have.status(200));",
+                  "const j = pm.response.json();",
+                  "pm.test('Capacity what-if fields', () => {",
+                  "  pm.expect(j.metrics.expectedExtraProblemShipmentsPerMonth).to.exist;",
+                  "  pm.expect(j.narrative).to.match(/20000|20,000|20k/i);",
+                  "  pm.expect(j.recommendations.length).to.be.at.least(2);",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "2. Extra examples",
+      "item": [
+        {
+          "name": "City delays — Ahmedabad 2025-07-15",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/insights/city-delays?city=Ahmedabad&date=2025-07-15",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "insights", "city-delays"],
+              "query": [
+                { "key": "city", "value": "Ahmedabad" },
+                { "key": "date", "value": "2025-07-15" }
+              ]
+            },
+            "description": "Same endpoint as use case 1 with a different city-day that also has a high problem count."
+          }
+        },
+        {
+          "name": "City delays — Chennai (default city overridden)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/insights/city-delays?city=Chennai&date=2025-08-15",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "insights", "city-delays"],
+              "query": [
+                { "key": "city", "value": "Chennai" },
+                { "key": "date", "value": "2025-08-15" }
+              ]
+            },
+            "description": "If `orders` is small, that date simply has few Chennai shipments — try another date from the data range 2025-01-01 to 2025-09-12."
+          }
+        },
+        {
+          "name": "Client failures — Sha and Sons (id 390) May 2025",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/insights/client-failures?clientId=390&from=2025-05-01&to=2025-05-31",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "insights", "client-failures"],
+              "query": [
+                { "key": "clientId", "value": "390" },
+                { "key": "from", "value": "2025-05-01" },
+                { "key": "to", "value": "2025-05-31" }
+              ]
+            },
+            "description": "Wider window for another high-failure client. Confirm `scope` shows Sha and Sons."
+          }
+        },
+        {
+          "name": "Warehouse 5 (New Delhi) August 2025",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/insights/warehouse-failures?warehouseId=5&yearMonth=2025-08",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "insights", "warehouse-failures"],
+              "query": [
+                { "key": "warehouseId", "value": "5" },
+                { "key": "yearMonth", "value": "2025-08" }
+              ]
+            },
+            "description": "Not Warehouse B — shows the same API works for any `warehouseId` from `/api/meta`."
+          }
+        },
+        {
+          "name": "City compare — Chennai vs Bengaluru Jul 2025",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/insights/city-compare?cityA=Chennai&cityB=Bengaluru&yearMonth=2025-07",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "insights", "city-compare"],
+              "query": [
+                { "key": "cityA", "value": "Chennai" },
+                { "key": "cityB", "value": "Bengaluru" },
+                { "key": "yearMonth", "value": "2025-07" }
+              ]
+            },
+            "description": "Second pair of cities for the comparison story."
+          }
+        },
+        {
+          "name": "Capacity risk — 5,000 extra orders (smaller surge)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/insights/capacity-risk?similarClientId=118&extraMonthlyOrders=5000",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "insights", "capacity-risk"],
+              "query": [
+                { "key": "similarClientId", "value": "118" },
+                { "key": "extraMonthlyOrders", "value": "5000" }
+              ]
+            },
+            "description": "Compare `volumeIncreaseVsCurrentMonthly` with the 20,000 run. Extra problem shipments should scale down roughly 4x."
+          }
+        }
+      ]
+    },
+    {
+      "name": "3. Edge cases",
+      "item": [
+        {
+          "name": "Empty slice — city/date with no rows",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/insights/city-delays?city=New Delhi&date=2020-01-01",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "insights", "city-delays"],
+              "query": [
+                { "key": "city", "value": "New Delhi" },
+                { "key": "date", "value": "2020-01-01" }
+              ]
+            },
+            "description": "Still HTTP 200. `metrics.orders` should be 0 and `narrative` should say no orders matched."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('HTTP 200', () => pm.response.to.have.status(200));",
+                  "const j = pm.response.json();",
+                  "pm.test('Empty slice explained', () => {",
+                  "  pm.expect(j.metrics.orders).to.eql(0);",
+                  "  pm.expect(j.narrative).to.match(/No orders matched/i);",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "Missing date (should fail)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/insights/city-delays?city=New Delhi",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "insights", "city-delays"],
+              "query": [
+                { "key": "city", "value": "New Delhi" }
+              ]
+            },
+            "description": "`date` is required. Expect **400** from Spring (`MissingServletRequestParameterException`)."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('HTTP 400 when date missing', () => pm.response.to.have.status(400));"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "Bad yearMonth format (should fail)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/insights/warehouse-failures?warehouseId=2&yearMonth=Aug-2025",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "insights", "warehouse-failures"],
+              "query": [
+                { "key": "warehouseId", "value": "2" },
+                { "key": "yearMonth", "value": "Aug-2025" }
+              ]
+            },
+            "description": "Must be `2025-08`. Invalid parse typically returns **500** (DateTimeParseException) on this demo app."
+          }
+        }
+      ]
+    }
+  ]
+}
