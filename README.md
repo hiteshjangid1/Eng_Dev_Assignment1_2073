@@ -1,6 +1,6 @@
 # Delivery Root-Cause Analyzer
 
-Java 17 / Spring Boot 3 demo that joins the eight logistics CSVs, tags delay and failure causes, and writes human-readable recommendations.
+Java 17 / Spring Boot 3 demo that joins the eight logistics CSVs, tags delay and failure causes, and writes human-readable recommendations. With a **Cursor API key** it becomes AI-powered: Cursor Cloud Agents turn tagged evidence into the briefing and answer natural-language questions. Cause tags stay rule-based so the model cannot invent a root cause.
 
 ## Data files
 
@@ -50,6 +50,30 @@ Step-by-step demo script: `postman/HOW-TO-TEST.md`.
 5. Festival: `GET /api/insights/festival?from=2025-01-01&to=2025-09-12`  
 6. Client Y onboard: `GET /api/insights/capacity-risk?similarClientId=118&extraMonthlyOrders=20000`
 
+## AI layer
+
+Causes are still tagged by rules (orders, warehouse, fleet, weather, feedback). The LLM only:
+
+1. Rewrites the **narrative and recommendations** from those facts  
+2. Routes a **plain-English question** to the right insight (`/api/insights/ask`)
+
+```bash
+set CURSOR_API_KEY=crsr_...
+mvn spring-boot:run
+```
+
+Create the key at [Cursor Dashboard → API Keys](https://cursor.com/dashboard). The app calls Cursor Cloud Agents (`composer-2.5`) on `https://api.cursor.com`. Without a key the app still runs; `aiGenerated` stays false. Check `GET /api/meta` → `ai`.
+
+Natural language (after the app is up):
+
+```
+GET /api/insights/ask?q=Why%20were%20deliveries%20delayed%20in%20New%20Delhi%20yesterday
+POST /api/insights/ask
+{"question":"If we onboard Client Y with 20000 extra monthly orders, what should we watch?"}
+```
+
+Startup demos stay rule-based unless `rca.ai.on-startup=true`.
+
 ## Demo mapping
 
 | Assignment question | Default in this repo |
@@ -66,4 +90,5 @@ Step-by-step demo script: `postman/HOW-TO-TEST.md`.
 Word files in `docs/`:
 
 - `How-This-Problem-Can-Be-Solved.docx` — write-up of how the delivery-failure problem can be solved (includes architecture diagram). Same content is also saved as `Delivery-Failure-Root-Cause-Solution.docx`  
-- `Sample-Use-Case-Outputs.docx` — recorded answers for the six assignment questions
+- `Sample-Use-Case-Outputs.docx` — recorded answers for the six assignment questions  
+- `Demo-Narration-Script.md` — voiceover script: project structure, API contract, then live demo

@@ -1,5 +1,6 @@
 package com.logistics.rca.analysis;
 
+import com.logistics.rca.ai.AiNarrativeService;
 import com.logistics.rca.csv.DataStore;
 import com.logistics.rca.domain.Cause;
 import com.logistics.rca.domain.CauseStat;
@@ -26,10 +27,12 @@ public class InsightService {
 
     private final DataStore store;
     private final RecommendationCatalog recommendations;
+    private final AiNarrativeService aiNarrative;
 
-    public InsightService(DataStore store, RecommendationCatalog recommendations) {
+    public InsightService(DataStore store, RecommendationCatalog recommendations, AiNarrativeService aiNarrative) {
         this.store = store;
         this.recommendations = recommendations;
+        this.aiNarrative = aiNarrative;
     }
 
     public InsightReport cityDelays(String city, LocalDate date) {
@@ -44,7 +47,7 @@ public class InsightService {
                         + " (matched on promised, actual, or order date)"
         );
         fill(report, slice, city);
-        return report;
+        return aiNarrative.enrich(report);
     }
 
     public InsightReport clientFailures(long clientId, LocalDate from, LocalDate to) {
@@ -60,7 +63,7 @@ public class InsightService {
                 "Client=" + name + " (id=" + clientId + "), " + from + " to " + to
         );
         fill(report, slice, name);
-        return report;
+        return aiNarrative.enrich(report);
     }
 
     public InsightReport warehouseFailures(long warehouseId, YearMonth month) {
@@ -76,7 +79,7 @@ public class InsightService {
                 label + ", month=" + month
         );
         fill(report, slice, label);
-        return report;
+        return aiNarrative.enrich(report);
     }
 
     public InsightReport compareCities(String cityA, String cityB, YearMonth month) {
@@ -120,7 +123,7 @@ public class InsightService {
         }
         report.getSampleOrderIds().addAll(a.getSampleOrderIds());
         report.getSampleOrderIds().addAll(b.getSampleOrderIds());
-        return report;
+        return aiNarrative.enrich(report);
     }
 
     public InsightReport festivalPeriod(LocalDate from, LocalDate to) {
@@ -162,7 +165,8 @@ public class InsightService {
         report.setNarrative(n.toString());
         report.getRecommendations().add("Stand up a festival control tower 10 days prior: daily join of warehouse dwell, traffic, and failed-first-attempt rates.");
         report.getRecommendations().addAll(recommendations.forCauses(festReport.getCauses(), "festival peak"));
-        return report;
+        report.getComplaintSamples().addAll(festReport.getComplaintSamples());
+        return aiNarrative.enrich(report);
     }
 
     public InsightReport onboardRisk(long similarClientId, int extraMonthlyOrders) {
@@ -230,7 +234,7 @@ public class InsightService {
                 + " and the proxy client's home city before the first peak week.");
         report.getRecommendations().addAll(recommendations.forCauses(report.getCauses(), "new-client surge"));
         report.getSampleOrderIds().addAll(sampleIds(similar.isEmpty() ? all : similar, 8));
-        return report;
+        return aiNarrative.enrich(report);
     }
 
     private InsightReport cityMonth(String city, YearMonth month) {
@@ -254,6 +258,7 @@ public class InsightService {
         report.getMetrics().put("openLate", countOutcome(slice, Outcome.OPEN_LATE));
         fillCausesOnly(report, problems);
         report.getSampleOrderIds().addAll(sampleIds(problems, 8));
+        report.getComplaintSamples().addAll(complaintSamples(problems, 8));
         report.setNarrative(buildNarrative(report, slice, problems, hint));
         report.getRecommendations().addAll(recommendations.forCauses(report.getCauses(), hint));
     }
@@ -404,6 +409,16 @@ public class InsightService {
 
     private static List<Long> sampleIds(List<EnrichedShipment> rows, int n) {
         return rows.stream().limit(n).map(s -> s.order().orderId()).toList();
+    }
+
+    private static List<String> complaintSamples(List<EnrichedShipment> rows, int n) {
+        return rows.stream()
+                .flatMap(s -> s.feedback().stream())
+                .map(f -> f.feedbackText())
+                .filter(t -> t != null && !t.isBlank())
+                .distinct()
+                .limit(n)
+                .toList();
     }
 
     private static String aliasWarehouse(Warehouse wh) {

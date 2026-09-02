@@ -79,6 +79,75 @@
       ]
     },
     {
+      "name": "0b. AI natural language",
+      "item": [
+        {
+          "name": "Ask — Why delayed in New Delhi yesterday?",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/insights/ask?q=Why were deliveries delayed in New Delhi yesterday?",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "insights", "ask"],
+              "query": [
+                { "key": "q", "value": "Why were deliveries delayed in New Delhi yesterday?" }
+              ]
+            },
+            "description": "AI router maps the sentence to CITY_DELAYS, then the insight engine runs, then the LLM writes the briefing if CURSOR_API_KEY is set.\n\nLook at `intent`, `report.aiGenerated`, `report.narrative`, `report.ruleBasedNarrative`."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('HTTP 200', () => pm.response.to.have.status(200));",
+                  "const j = pm.response.json();",
+                  "pm.test('Has intent and report', () => {",
+                  "  pm.expect(j.intent).to.be.a('string');",
+                  "  pm.expect(j.report.narrative).to.be.a('string').that.is.not.empty;",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "Ask POST — Client Y 20000 extra orders",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"question\": \"If we onboard Client Y with about 20000 extra monthly orders, what new failure risks should we expect?\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/insights/ask",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "insights", "ask"]
+            },
+            "description": "Should route to CAPACITY_RISK. With an API key, `report.aiGenerated` is true."
+          }
+        },
+        {
+          "name": "Ask — Warehouse B in August",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/insights/ask?q=Explain the top reasons for delivery failures linked to Warehouse B in August",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "insights", "ask"],
+              "query": [
+                { "key": "q", "value": "Explain the top reasons for delivery failures linked to Warehouse B in August" }
+              ]
+            }
+          }
+        }
+      ]
+    },
+    {
       "name": "1. Sample use cases",
       "item": [
         {

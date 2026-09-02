@@ -1,5 +1,7 @@
 package com.logistics.rca.api;
 
+import com.logistics.rca.ai.AiProperties;
+import com.logistics.rca.ai.AiRuntime;
 import com.logistics.rca.csv.DataStore;
 import com.logistics.rca.domain.Client;
 import com.logistics.rca.domain.Warehouse;
@@ -17,9 +19,13 @@ import java.util.Map;
 public class MetaController {
 
     private final DataStore store;
+    private final AiProperties aiProperties;
+    private final AiRuntime aiRuntime;
 
-    public MetaController(DataStore store) {
+    public MetaController(DataStore store, AiProperties aiProperties, AiRuntime aiRuntime) {
         this.store = store;
+        this.aiProperties = aiProperties;
+        this.aiRuntime = aiRuntime;
     }
 
     @GetMapping
@@ -58,6 +64,14 @@ public class MetaController {
                 })
                 .toList();
         m.put("warehousesDetail", warehouses);
+        m.put("ai", Map.of(
+                "enabled", aiProperties.isEnabled(),
+                "apiKeyConfigured", aiProperties.hasKey(),
+                "willCallLlmOnHttp", aiRuntime.configured(),
+                "model", aiProperties.getModel(),
+                "provider", aiProperties.getProvider(),
+                "askEndpoint", "/api/insights/ask?q=Why+were+deliveries+delayed+in+New+Delhi+yesterday"
+        ));
         m.put("demoHints", Map.of(
                 "cityX", "New Delhi on 2025-01-24 (highest problem city-day in the file)",
                 "clientX", "409 Bath, Bhatt and Gulati",
