@@ -13,6 +13,15 @@ mvn spring-boot:run
 Wait for: `Tomcat started on port 8080`.  
 Startup also prints the six demos in the console and writes `reports/sample-use-case-outputs.txt`.
 
+To turn on the LLM for HTTP insights (optional):
+
+```bash
+set CURSOR_API_KEY=crsr_your-key
+mvn spring-boot:run
+```
+
+Then use Postman folder **0b. AI natural language**, or `GET /api/insights/ask?q=...`. Reports include `aiGenerated` and `ruleBasedNarrative`. Without a key, questions still run using keyword routing and template text.
+
 ## 2. Import Postman
 
 1. Open Postman → **Import**.

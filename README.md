@@ -89,6 +89,6 @@ Startup demos stay rule-based unless `rca.ai.on-startup=true`.
 
 Word files in `docs/`:
 
-- `How-This-Problem-Can-Be-Solved.docx` — write-up of how the delivery-failure problem can be solved (includes architecture diagram). Same content is also saved as `Delivery-Failure-Root-Cause-Solution.docx`  
+- `How-This-Problem-Can-Be-Solved-updated.docx` — current write-up (AI layer included). Also `Delivery-Failure-Root-Cause-Solution.docx`. If Word has the older `How-This-Problem-Can-Be-Solved.docx` open, close it and replace with the updated file.  
 - `Sample-Use-Case-Outputs.docx` — recorded answers for the six assignment questions  
 - `Demo-Narration-Script.md` — voiceover script: project structure, API contract, then live demo
